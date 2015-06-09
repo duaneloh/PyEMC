@@ -1,0 +1,23 @@
+====================================
+Zhaslan:
+Setting up Enthought on KANE 
+- Create Enthough distro in your own home directory
+- Install key packages (matplotlib, scipy, h5py, opencv, sci-kit libs, mpi4py)
+
+Particle picking code
+- Name particle data using the convention EM_MNHH_DDMMYY.h5 (or *.avi), where times are experiment times.
+- Store data in /mnt/cbis/images/duaneloh/EMData
+- Write particle-picking script to PyEMC repo (using default parameters)?
+- Try particle-picking code work on KANE?
+
+EMC code
+- Cython version of E+C on a 3D volume.
+- Fill in mpi4py EMC template created by Duane
+- Compute pair-wise distance matrix between all picked particles.
+- Try a simple Euclidean distance model.
+
+====================================
+Duane:
+- Create mpi4py templates
+	-- EMC specific examples 
+- Adaptive quaternion calculator
