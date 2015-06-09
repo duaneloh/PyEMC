@@ -1,0 +1,31 @@
+\documentclass{article}
+\usepackage{amsmath}
+\begin{document}
+
+\section{Test sufficiency of angular sampling}
+
+\begin{enumerate}
+	\item{}Create a $L\times L \times L$ cube of zeros, $\rho(\vec{r})$. Here, $L$ matches the image length of your 2D projections.
+
+	\item{}Fill $\rho(\vec{r})$ with a centered ball of random values. This ball should have radius $R_N$, the approximate radius of the nanoparticle in the experimental data. Plot the central sections of $\rho(\vec{r})$: $\rho(x,y,0)$, $\rho(x,0,z)$, $\rho(0,y,z)$. \label{alg0:create_ball}
+
+	\item{}Apply a low-pass filter to the densities $\rho(\vec{r})$. To do this, Fourier transform $\rho(\vec{r}) \to \rho(\vec{k})$ and apply the low-pass filter:
+		\begin{equation}
+			\rho_B(\vec{k}) = \rho(\vec{k}) \exp{\left(-\frac{|\vec{k}|^2}{2 k_0^2}\right)}, 
+		\end{equation}
+		where $k_0$ is approximately $R_N/2$.
+		
+	\item{}Inverse Fourier transform $\rho_B(\vec{k}) \to \rho_B(\vec{r})$. Plot the central sections of this blurred object. Check that you get a blurred versions of the central sections in step \ref{alg0:create_ball}.
+
+	\item{}We are ready to expand our densities. Do \texttt{expand}($\rho_B(\vec{k})$, quat$_n$) $\to \widetilde{\rho}_B(j,i)$ to obtain the tomograms sampled by the list of quaternions quat$_n$. I will give you a number of quaternions $\{n=4,\ldots,10\}$. {\bf Time how long this takes, and how much memory is used.}
+	\item{}Now, \texttt{compress}($\widetilde{\rho}_B(j,i)$, quat$_n$) $\to \widetilde{\rho}_B(\vec{k})$. {\bf Time how long this takes, and how much memory is used.}
+	\item{} Compute the resolution-resolved error 
+		\begin{equation}
+			\Delta(k) = \sqrt{\left\langle \left( |\widetilde{\rho}_B(\vec{k})| - |\rho_B(\vec{k})|\right)^2 \right\rangle_{|\vec{k}| = k}}.
+		\end{equation}
+		You should modify your algorithm for computing angular averages to do this.
+	\item{}Plot how $\Delta(k)$ varies with $n$, for the $\rho_{L\times L \times L}$ that is relevant to our problem.
+\end{enumerate}
+
+
+\end{document}
