@@ -73,13 +73,13 @@ def CalcRotMat(numpy.ndarray[numpy.double_t, ndim=1] q):
 	
 	rotmat[0,0]=q1**2+q2**2-q3**2-q4**2
 	rotmat[0,1]=2*q2*q3-2*q1*q4
-#	rotmat[0,2]=2*q2*q4+2*q1*q3
+	rotmat[0,2]=2*q2*q4+2*q1*q3
 	rotmat[1,0]=2*q2*q3+2*q1*q4
 	rotmat[1,1]=q1**2-q2**2+q3**2-q4**2
-#	rotmat[1,2]=2*q3*q4-2*q1*q2
+	rotmat[1,2]=2*q3*q4-2*q1*q2
 	rotmat[2,0]=2*q2*q4-2*q1*q3
 	rotmat[2,1]=2*q3*q4+2*q1*q2
-#	rotmat[2,2]=q1**2-q2**2-q3**2+q4**2
+	rotmat[2,2]=q1**2-q2**2-q3**2+q4**2
 
 	return rotmat
 
@@ -162,7 +162,7 @@ def expand(numpy.ndarray[numpy.double_t, ndim=3] W, numpy.ndarray[numpy.double_t
 	cdef double rx,ry,rz,dx1,dx,dy1,dy,dz1,dz
 	cdef double v000,v100,v010,v110,v001,v101,v011,v111
 	cdef int ix,iy,iz,x,y,z
-	
+#	cdef list realcoor =[]
 	for n from 0 <= n < N:
 		rotmat=CalcRotMat(quat[n])
 		for j from 0 <= j < k0.shape[0]:
@@ -184,12 +184,13 @@ def expand(numpy.ndarray[numpy.double_t, ndim=3] W, numpy.ndarray[numpy.double_t
 			dx1=rx-x
 			dy1=ry-y
 			dz1=rz-z
-			dx=x+1-rx
-			dy=y+1-ry
-			dz=z+1-rz
+			dx=x+1.0-rx
+			dy=y+1.0-ry
+			dz=z+1.0-rz
 			v000=W[x,y,z];v100=W[x+1,y,z];v010=W[x,y+1,z];v110=W[x+1,y+1,z]
 			v001=W[x,y,z+1];v101=W[x+1,y,z+1];v011=W[x,y+1,z+1];v111=W[x+1,y+1,z+1]
 			stack[n,ix,iy]=v000*dx*dy*dz+v100*dx1*dy*dz+v010*dx*dy1*dz+v110*dx1*dy1*dz+v001*dx*dy*dz1+v101*dx1*dy*dz1+v011*dx*dy1*dz1+v111*dx1*dy1*dz1
+
 	return stack
 
 
@@ -201,17 +202,22 @@ def compress(numpy.ndarray[numpy.double_t,ndim=3] slices,numpy.ndarray[numpy.dou
 	cdef numpy.ndarray[numpy.double_t, ndim=3] W=numpy.zeros((slices.shape[1],slices.shape[1],slices.shape[1]),dtype='double')
 	cdef int R=int((slices.shape[1]-1)/2)
 	cdef int x,y,z,ix,iy
-	
+	cdef numpy.ndarray[numpy.double_t,ndim=2] rotmat=numpy.zeros((3,3), dtype='double')
 	cdef double point,rx,ry,rz,dx,dy,dz,dx1,dy1,dz1
 	cdef int n,j,i,k
-	
+	cdef double w1,w2,w3,w4,w5,w6,w7,w8
 	for n from 0 <= n < N:
+		rotmat=CalcRotMat(quat[n])
 		for j from 0 <= j < k0.shape[0]:
 			ix=k0[j,0]
 			iy=k0[j,1]
-			rx=(quat[n,0]**2+quat[n,1]**2-quat[n,2]**2-quat[n,3]**2)*ix+(2*quat[n,1]*quat[n,2]-2*quat[n,0]*quat[n,3])*iy
-			ry=(2*quat[n,1]*quat[n,2]+2*quat[n,0]*quat[n,3])*ix+(quat[n,0]**2-quat[n,1]**2+quat[n,2]**2-quat[n,3]**2)*iy
-			rz=(2*quat[n,1]*quat[n,3]-2*quat[n,0]*quat[n,2])*ix+(2*quat[n,2]*quat[n,3]+2*quat[n,0]*quat[n,1])*iy
+#			rx=(quat[n,0]**2+quat[n,1]**2-quat[n,2]**2-quat[n,3]**2)*ix+(2*quat[n,1]*quat[n,2]-2*quat[n,0]*quat[n,3])*iy
+#			ry=(2*quat[n,1]*quat[n,2]+2*quat[n,0]*quat[n,3])*ix+(quat[n,0]**2-quat[n,1]**2+quat[n,2]**2-quat[n,3]**2)*iy
+#			rz=(2*quat[n,1]*quat[n,3]-2*quat[n,0]*quat[n,2])*ix+(2*quat[n,2]*quat[n,3]+2*quat[n,0]*quat[n,1])*iy
+			rx=rotmat[0,0]*ix+rotmat[0,1]*iy
+			ry=rotmat[1,0]*ix+rotmat[1,1]*iy
+			rz=rotmat[2,0]*ix+rotmat[2,1]*iy
+
 			if sqrt(rx*rx+ry*ry+rz*rz)>0.99*R:
 				continue
 			rx=rx+R
@@ -226,25 +232,34 @@ def compress(numpy.ndarray[numpy.double_t,ndim=3] slices,numpy.ndarray[numpy.dou
 			dx1=rx-x
 			dy1=ry-y
 			dz1=rz-z
-			dx=x+1-rx
-			dy=y+1-ry
-			dz=z+1-rz
-			weights[x,y,z]+=dx*dy*dz
-			weights[x+1,y,z]+=dx1*dy*dz
-			weights[x,y+1,z]+=dx*dy1*dz
-			weights[x+1,y+1,z]+=dx1*dy1*dz
-			weights[x,y,z+1]+=dx*dy*dz1
-			weights[x+1,y,z+1]+=dx1*dy*dz1
-			weights[x,y+1,z+1]+=dx*dy1*dz1
-			weights[x+1,y+1,z+1]+=dx1*dy1*dz1
-			W[x,y,z]+=point*weights[x,y,z]
-			W[x+1,y,z]+=point*weights[x+1,y,z]
-			W[x,y+1,z]+=point*weights[x,y+1,z]
-			W[x+1,y+1,z]+=point*weights[x+1,y+1,z]
-			W[x,y,z+1]+=point*weights[x,y,z+1]
-			W[x+1,y,z+1]+=point*weights[x+1,y,z+1]
-			W[x,y+1,z+1]+=point*weights[x,y+1,z+1]
-			W[x+1,y+1,z+1]+=point*weights[x+1,y+1,z+1]
+			dx=x+1.0-rx
+			dy=y+1.0-ry
+			dz=z+1.0-rz
+			w1=dx*dy*dz
+			w2=dx1*dy*dz
+			w3=dx*dy1*dz
+			w4=dx1*dy1*dz
+			w5=dx*dy*dz1
+			w6=dx1*dy*dz1
+			w7=dx*dy1*dz1
+			w8=dx1*dy1*dz1
+			
+			weights[x,y,z]+=w1
+			weights[x+1,y,z]+=w2
+			weights[x,y+1,z]+=w3
+			weights[x+1,y+1,z]+=w4
+			weights[x,y,z+1]+=w5
+			weights[x+1,y,z+1]+=w6
+			weights[x,y+1,z+1]+=w7
+			weights[x+1,y+1,z+1]+=w8
+			W[x,y,z]+=point*w1
+			W[x+1,y,z]+=point*w2
+			W[x,y+1,z]+=point*w3
+			W[x+1,y+1,z]+=point*w4
+			W[x,y,z+1]+=point*w5
+			W[x+1,y,z+1]+=point*w6
+			W[x,y+1,z+1]+=point*w7
+			W[x+1,y+1,z+1]+=point*w8
 
 #			vlist=numpy.array([[x,y,z],[x+1,y,z],[x,y+1,z],[x+1,y+1,z],[x,y,z+1],[x+1,y,z+1],[x,y+1,z+1],[x+1,y+1,z+1]])
 #			u[:]=0
@@ -254,7 +269,7 @@ def compress(numpy.ndarray[numpy.double_t,ndim=3] slices,numpy.ndarray[numpy.dou
 #					if locpoint<0 or locpoint>2*R:
 #						u[h]+=1
 #			for h in range(8):
-#				loc=vlist[h]
+ #				loc=vlist[h]
 #				if u[h]==0:
 
 #			weights[loc[0],loc[1],loc[2]]=(1-abs(i[0]-loc[0]))*(1-abs(i[1]-loc[1]))*(1-abs(i[2]-loc[2]))
@@ -284,9 +299,12 @@ def compress(numpy.ndarray[numpy.double_t,ndim=3] slices,numpy.ndarray[numpy.dou
 				if weights[i,j,k]>0:
 					W[i,j,k]=W[i,j,k]/weights[i,j,k]
 
+#	weights[weights==0]=1
+#	W=numpy.divide(W,weights)
+
 	return W
 
-def angAve3D(numpy.ndarray[numpy.double_t, ndim=3] W1,numpy.ndarray[numpy.double_t, ndim=3] W2, numpy.ndarray[numpy.int64_t, ndim=3] r3):
+def angAveDif(numpy.ndarray[numpy.double_t, ndim=3] W1,numpy.ndarray[numpy.double_t, ndim=3] W2, numpy.ndarray[numpy.int64_t, ndim=3] r3):
 	assert W1.dtype==numpy.double and r3.dtype==numpy.int
 	
 	cdef int i,j,k
@@ -308,6 +326,27 @@ def angAve3D(numpy.ndarray[numpy.double_t, ndim=3] W1,numpy.ndarray[numpy.double
 			sumint[i]=sqrt(sumint[i]/count[i])
 	return sumint
 
+def angAve(numpy.ndarray[numpy.double_t, ndim=3] W1, numpy.ndarray[numpy.int64_t, ndim=3] r3):
+	assert W1.dtype==numpy.double and r3.dtype==numpy.int
+	
+	cdef int i,j,k
+	cdef int rlim=r3.max()+1
+	cdef numpy.ndarray[numpy.double_t, ndim=1] sumint=numpy.zeros(rlim, dtype='double')
+	cdef numpy.ndarray[numpy.int_t,ndim=1] count=numpy.zeros(rlim, dtype='int')
+	cdef int a= W1.shape[0]
+	cdef int b= W1.shape[1]
+	cdef int c= W1.shape[2]
+#	a,b,c=Volume.shape
+#	xv,yv,zv=numpy.mgrid[-(a-1)/2:(a+1)/2,-(b-1)/2:(b+1)/2,-(c-1)/2:(c+1)/2]
+	for i in range(a):
+		for j in range(b):
+			for k in range(c):
+				sumint[r3[i,j,k]]+=W1[i,j,k]*W1[i,j,k]
+				count[r3[i,j,k]]+=1
+	for i in range(rlim):
+		if count[i]>0:
+			sumint[i]=sqrt(sumint[i]/count[i])
+	return sumint
 
 
 
