@@ -13,13 +13,13 @@ from skimage import measure
 from skimage import filter, morphology
 from itertools import combinations
 from scipy import ndimage
-from mahotas.polygon import fill_convexhull
+#from mahotas.polygon import fill_convexhull
 import time
 import resource
 
-sys.path.append(os.path.abspath('../myFunctions'))
+#sys.path.append(os.path.abspath('../myFunctions'))
 import handyCythonLib
-import unhandyCythonLib
+#import unhandyCythonLib
 
 def RefTom(R):
 	xv,yv=numpy.mgrid[-R:R+1,-R:R+1]
@@ -66,7 +66,7 @@ def mkdir(dirName):
 		os.makedirs(dirName)
 
 
-L=375
+L=125
 ce=(L-1)/2
 R=20
 sigma=R/2
@@ -78,15 +78,14 @@ Ro=numpy.zeros((L,L,L),dtype='double')
 #W = RandomVolume(R,CreateSliceOnly=False)
 W=numpy.random.random_integers(0,10000,(2*R+1,2*R+1,2*R+1))
 Ro[ce-R:ce+R+1,ce-R:ce+R+1,ce-R:ce+R+1]=W
-mask=Ro>=filter.threshold_otsu(Ro[Ro>0])
-mask=ndimage.binary_fill_holes(mask)
-mask=ndimage.binary_opening(mask, structure=structure)
-mask=ndimage.binary_closing(mask, structure=morphology.ball(3), iterations=1)
-Ro=ndimage.filters.gaussian_filter(Ro, sigma=5)*mask
+#mask=Ro>=filter.threshold_otsu(Ro[Ro>0])
+#mask=ndimage.binary_fill_holes(mask)
+#mask=ndimage.binary_opening(mask, structure=structure)
+#mask=ndimage.binary_closing(mask, structure=morphology.ball(3), iterations=1)
+#Ro=ndimage.filters.gaussian_filter(Ro, sigma=5)#*mask
 inputDir = '/Volumes/Untitled/3D-reconstruction/29_20150504_141003_2015-05-05-14-05/'
-path= '/Volumes/Untitled/imaging/PyEMC/quaternions/'
-mkdir('/Volumes/Untitled/imaging/PyEMC/testresults1')
-saving='/Volumes/Untitled/imaging/PyEMC/testresults1'
+path= '/mnt/cbis/home/barzhas/working_dir/PyEMC/quaternions/'
+saving='/mnt/cbis/home/barzhas/working_dir/PyEMC/testresults1'
 xv,yv,zv=numpy.mgrid[-ce:ce+1,-ce:ce+1,-ce:ce+1]
 kv=numpy.double(numpy.sqrt(xv**2+yv**2+zv**2))
 r3=numpy.round(kv).astype('int')
