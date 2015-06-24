@@ -135,12 +135,15 @@ xz=numpy.zeros((len(quatlists)+1, L), dtype='double')
 yz=numpy.zeros((len(quatlists)+1, L), dtype='double')
 angave[0]=handyCythonLib.angAve(rbk,r3)
 k0=RefTom(ce)
-xy[0]=log(rbk[ce,ce,:])
-xz[0]=log(rbk[ce,:,ce])
-yz[0]=log(rbk[:,ce,ce])
+xy[0]=numpy.log(rbk[ce,ce,:])
+xz[0]=numpy.log(rbk[ce,:,ce])
+yz[0]=numpy.log(rbk[:,ce,ce])
 title=os.path.join(saving,'center cut original.png')
 showcuts(log(rbk),ce,title)
-
+stack=numpy.zeros((L*(1+len(quatlists)),3*L, dtype='uint8')
+stack[-L:,:L]=numpy.log(rbk[ce,:,:])
+stack[-L:,L:2*L]=numpy.log(rbk[:,ce,:])
+stack[-L:,2*L:3*L]=numpy.log(rbk[:,:,ce])
 for i in range(len(quatlists)):
 	quatx,n=readlist(path,quatlists[i])
 	print n
@@ -167,11 +170,12 @@ for i in range(len(quatlists)):
 	ResResErr[i]=handyCythonLib.angAveDif(rbk1,rbk,r3)/angave[0]
 	ratio[i]=handyCythonLib.angAve(rbk1/rbk,r3)
 	angave[i+1]=handyCythonLib.angAve(rbk1,r3)
-	xy[i+1]=log(rbk1[ce,ce,:])
-	xz[i+1]=log(rbk1[ce,:,ce])
-	yz[i+1]=log(rbk1[:,ce,ce])
-
-
+	xy[i+1]=numpy.log(rbk1[ce,ce,:])
+	xz[i+1]=numpy.log(rbk1[ce,:,ce])
+	yz[i+1]=numpy.log(rbk1[:,ce,ce])
+	stack[L*i:L*i+L,:L]=numpy.log(rbk1[ce,:,:])
+	stack[L*i:L*i+L,L:2*L]=numpy.log(rbk1[:,ce,:])
+	stack[L*i:L*i+L,2*L:3*L]=numpy.log(rbk1[:,:,ce])
 
 plotcuts(yf=xy,label='x=0,y=0')
 plotcuts(yf=xy,label='x=0,z=0')
@@ -181,8 +185,11 @@ plotcuts(yf=angave/angave[0], label='ratio of angular average', xlim=True)
 plotcuts(yf=ratio, label=' angular average of ratio',dropzero=True, xlim=True)
 iangave=angave[:,:ce]
 plotcuts(yf=iangave[0]/iangave, label='inverse angular average of ratio',dropzero=True)
-
-
+fig=plt.figure()
+ax=fig.add_subplot(111)
+ax.imshow(stack)
+fig.savefig(saving+'center cut stack.png')
+plt.close()
 
 
 
