@@ -64,13 +64,22 @@ def memorycons():
 def mkdir(dirName):
 	if (os.path.exists(dirName) == False):
 		os.makedirs(dirName)
+def showcuts(rbk,ce,title):
+	fig=plt.figure()
+	ax1=fig.add_subplot(131)
+	ax1.imshow(rbk[ce,:,:])
+	ax2=fig.add_subplot(132)
+	ax2.imshow(rbk[:,ce,;])
+	ax3=fig.add_subplot(133)
+	ax3.imshow(rbk[:,:,ce])
+	fig.savefig(title,bbox='tight')
 
 
-L=125
+L=375
 ce=(L-1)/2
 R=20
 sigma=R/2
-quatlists=[10]
+quatlists=range(1,11)#[10]
 structure=numpy.array([[[0,0,0],[0,1,0],[0,0,0]],[[0,1,0],[1,1,1],[0,1,0]],[[0,0,0],[0,1,0],[0,0,0]]])
 
 
@@ -122,9 +131,11 @@ for i in range(len(quatlists)):
 	m2=memorycons()
 	print 'time executed for compression is',t2-t1
 	print 'memory executed for compression is',m2-m1
+	title=os.path.join(saving,'center cut '+str(quatlists[i])+'.png')
+	showcuts(log(rbk1),ce,title)
 	memorylist[i]=numpy.asarray([m0,m1,m2])
 	timelist[i]=numpy.asarray([t1-t0,t2-t1])
-	ResResErr[i]=handyCythonLib.angAveDif(rbk1,rbk,r3)
+	ResResErr[i]=handyCythonLib.angAveDif(rbk1,rbk,r3)/angave[0]
 	angave[i+1]=handyCythonLib.angAve(rbk1,r3)
 
 
