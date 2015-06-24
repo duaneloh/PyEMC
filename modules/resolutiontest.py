@@ -73,19 +73,39 @@ def showcuts(rbk,ce,title):
 	ax3=fig.add_subplot(133)
 	ax3.imshow(rbk[:,:,ce])
 	fig.savefig(title,bbox='tight')
+	plt.close()
 
+def plotcuts(yf, label, dropzero=False,ylim=False, xlim=False)
+	n=yf.shape[0]
+	rm=yf.shape[1]
+	t=int(rm/numpy.sqrt(3))
+	fig=plt.figure()
+	ax=fig.add_subplot(111)
+	for i in range(n):
+		if dropzero==False:
+			index=i
+		else:
+			index=i+1
+		ax.plot(yf[i], label='quat '+str(index))
+		if ylim==True:
+			ax.set_ylim([0,1])
+		if xlim==True:
+			ax.set_xlim([0,t])
+	ax.legend()
+	fig.savefig(saving+label+'.png')
+	plt.close()
 
 L=375
 ce=(L-1)/2
-R=20
+R=48
 sigma=R/2
 quatlists=range(1,11)#[10]
 structure=numpy.array([[[0,0,0],[0,1,0],[0,0,0]],[[0,1,0],[1,1,1],[0,1,0]],[[0,0,0],[0,1,0],[0,0,0]]])
 
 
 Ro=numpy.zeros((L,L,L),dtype='double')
-#W = RandomVolume(R,CreateSliceOnly=False)
-W=numpy.random.random_integers(0,10000,(2*R+1,2*R+1,2*R+1))
+W = RandomVolume(R,CreateSliceOnly=False)
+#W=numpy.random.random_integers(0,10000,(2*R+1,2*R+1,2*R+1))
 Ro[ce-R:ce+R+1,ce-R:ce+R+1,ce-R:ce+R+1]=W
 #mask=Ro>=filter.threshold_otsu(Ro[Ro>0])
 #mask=ndimage.binary_fill_holes(mask)
@@ -94,7 +114,7 @@ Ro[ce-R:ce+R+1,ce-R:ce+R+1,ce-R:ce+R+1]=W
 #Ro=ndimage.filters.gaussian_filter(Ro, sigma=5)#*mask
 inputDir = '/Volumes/Untitled/3D-reconstruction/29_20150504_141003_2015-05-05-14-05/'
 path= '/mnt/cbis/home/barzhas/working_dir/PyEMC/quaternions/'
-saving='/mnt/cbis/home/barzhas/working_dir/PyEMC/testresults1'
+saving='/mnt/cbis/home/barzhas/working_dir/PyEMC/testresults1/'
 xv,yv,zv=numpy.mgrid[-ce:ce+1,-ce:ce+1,-ce:ce+1]
 kv=numpy.double(numpy.sqrt(xv**2+yv**2+zv**2))
 r3=numpy.round(kv).astype('int')
@@ -109,9 +129,18 @@ memorylist=numpy.zeros((len(quatlists),3),dtype='double')
 numquat=numpy.zeros(len(quatlists), dtype='int')
 ResResErr=numpy.zeros((len(quatlists), len(kradius)), dtype='double')
 angave=numpy.zeros((len(quatlists)+1, len(kradius)), dtype='double')
+ratio=numpy.zeros((len(quatlists), len(kradius)), dtype='double')
+xy=numpy.zeros((len(quatlists)+1, L), dtype='double')
+xz=numpy.zeros((len(quatlists)+1, L), dtype='double')
+yz=numpy.zeros((len(quatlists)+1, L), dtype='double')
 angave[0]=handyCythonLib.angAve(rbk,r3)
-
 k0=RefTom(ce)
+xy[0]=log(rbk[ce,ce,:])
+xz[0]=log(rbk[ce,:,ce])
+yz[0]=log(rbk[:,ce,ce])
+title=os.path.join(saving,'center cut original.png')
+showcuts(log(rbk),ce,title)
+
 for i in range(len(quatlists)):
 	quatx,n=readlist(path,quatlists[i])
 	print n
@@ -136,7 +165,23 @@ for i in range(len(quatlists)):
 	memorylist[i]=numpy.asarray([m0,m1,m2])
 	timelist[i]=numpy.asarray([t1-t0,t2-t1])
 	ResResErr[i]=handyCythonLib.angAveDif(rbk1,rbk,r3)/angave[0]
+	ratio[i]=handyCythonLib.angAve(rbk1/rbk,r3)
 	angave[i+1]=handyCythonLib.angAve(rbk1,r3)
+	xy[i+1]=log(rbk1[ce,ce,:])
+	xz[i+1]=log(rbk1[ce,:,ce])
+	yz[i+1]=log(rbk1[:,ce,ce])
+
+
+
+plotcuts(yf=xy,label='x=0,y=0')
+plotcuts(yf=xy,label='x=0,z=0')
+plotcuts(yf=yz,label='z=0,y=0')
+plotcuts(yf=ResResErr, label='error-L=375-R=20', dropzero=True,xlim=True, ylim=True)
+plotcuts(yf=angave/angave[0], label='ratio of angular average', xlim=True)
+plotcuts(yf=ratio, label=' angular average of ratio',dropzero=True, xlim=True)
+iangave=angave[:,:ce]
+plotcuts(yf=iangave[0]/iangave, label='inverse angular average of ratio',dropzero=True)
+
 
 
 
