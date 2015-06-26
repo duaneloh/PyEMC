@@ -22,78 +22,78 @@ import handyCythonLib
 #import unhandyCythonLib
 
 def RefTom(R):
-	xv,yv=numpy.mgrid[-R:R+1,-R:R+1]
-	r=numpy.sqrt(xv**2+yv**2)
-	a,b=numpy.where(r<=R)
-	a=a-R
-	b=b-R
-	c=numpy.zeros(a.shape,a.dtype)
-	k=numpy.vstack((a,b,c)).T
-	return k
+    xv,yv=numpy.mgrid[-R:R+1,-R:R+1]
+    r=numpy.sqrt(xv**2+yv**2)
+    a,b=numpy.where(r<=R)
+    a=a-R
+    b=b-R
+    c=numpy.zeros(a.shape,a.dtype)
+    k=numpy.vstack((a,b,c)).T
+    return k
 
 def RandomVolume(R, CreateSliceOnly=True ):
-	xv,yv,zv=numpy.mgrid[-R:R+1,-R:R+1,-R:R+1]
-	
-	if CreateSliceOnly==False:
-		W=numpy.random.random_integers(0,10000,(2*R+1,2*R+1,2*R+1))
-		r=numpy.sqrt(xv**2+yv**2+zv**2)
-		mask= r<=R
-		W=W*mask
-	else:
-		W=numpy.zeros((2*R+1,2*R+1,2*R+1),dtype='uint32')
-		xv=xv[:,:,R]
-		yv=yv[:,:,R]
-		r=numpy.sqrt(xv**2+yv**2)
-		mask= r<=R
-		randomslice=(numpy.random.random_integers(0,10000,(2*R+1,2*R+1))*mask).astype(W.dtype)
-		W[:,:,R]=randomslice
-	return W
+    xv,yv,zv=numpy.mgrid[-R:R+1,-R:R+1,-R:R+1]
+
+    if CreateSliceOnly==False:
+        W=numpy.random.random_integers(0,10000,(2*R+1,2*R+1,2*R+1))
+        r=numpy.sqrt(xv**2+yv**2+zv**2)
+        mask= r<=R
+        W=W*mask
+    else:
+        W=numpy.zeros((2*R+1,2*R+1,2*R+1),dtype='uint32')
+        xv=xv[:,:,R]
+        yv=yv[:,:,R]
+        r=numpy.sqrt(xv**2+yv**2)
+        mask= r<=R
+        randomslice=(numpy.random.random_integers(0,10000,(2*R+1,2*R+1))*mask).astype(W.dtype)
+        W[:,:,R]=randomslice
+    return W
 
 def readlist(path,i):
-	filename = 'quaternion'+str(i)+'.dat'
-	filename = os.path.join(path, filename)
-	with open(filename,'r') as f:
-		[w]=[int(x) for x in f.readline().split()]
-		array=numpy.asarray([numpy.asarray([numpy.double(x) for x in line.split()]) for line in f])
-	return array,w
+    filename = 'quaternion'+str(i)+'.dat'
+    filename = os.path.join(path, filename)
+    with open(filename,'r') as f:
+        [w]=[int(x) for x in f.readline().split()]
+        array=numpy.asarray([numpy.asarray([numpy.double(x) for x in line.split()]) for line in f])
+    return array,w
 
 def memorycons():
-	consumption=resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1000
-	return consumption
+    consumption=resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1000
+    return consumption
 
 def mkdir(dirName):
-	if (os.path.exists(dirName) == False):
-		os.makedirs(dirName)
+    if (os.path.exists(dirName) == False):
+        os.makedirs(dirName)
 def showcuts(rbk,ce,title):
-	fig=plt.figure()
-	ax1=fig.add_subplot(131)
-	ax1.imshow(rbk[ce,:,:])
-	ax2=fig.add_subplot(132)
-	ax2.imshow(rbk[:,ce,;])
-	ax3=fig.add_subplot(133)
-	ax3.imshow(rbk[:,:,ce])
-	fig.savefig(title,bbox='tight')
-	plt.close()
+    fig=plt.figure()
+    ax1=fig.add_subplot(131)
+    ax1.imshow(rbk[ce,:,:])
+    ax2=fig.add_subplot(132)
+    ax2.imshow(rbk[:,ce,;])
+    ax3=fig.add_subplot(133)
+    ax3.imshow(rbk[:,:,ce])
+    fig.savefig(title,bbox='tight')
+    plt.close()
 
 def plotcuts(yf, label, dropzero=False,ylim=False, xlim=False)
-	n=yf.shape[0]
-	rm=yf.shape[1]
-	t=int(rm/numpy.sqrt(3))
-	fig=plt.figure()
-	ax=fig.add_subplot(111)
-	for i in range(n):
-		if dropzero==False:
-			index=i
-		else:
-			index=i+1
-		ax.plot(yf[i], label='quat '+str(index))
-		if ylim==True:
-			ax.set_ylim([0,1])
-		if xlim==True:
-			ax.set_xlim([0,t])
-	ax.legend()
-	fig.savefig(saving+label+'.png')
-	plt.close()
+    n=yf.shape[0]
+    rm=yf.shape[1]
+    t=int(rm/numpy.sqrt(3))
+    fig=plt.figure()
+    ax=fig.add_subplot(111)
+    for i in range(n):
+        if dropzero==False:
+            index=i
+        else:
+            index=i+1
+        ax.plot(yf[i], label='quat '+str(index))
+        if ylim==True:
+            ax.set_ylim([0,1])
+        if xlim==True:
+            ax.set_xlim([0,t])
+    ax.legend()
+    fig.savefig(saving+label+'.png')
+    plt.close()
 
 L=375
 ce=(L-1)/2
@@ -145,37 +145,37 @@ stack[-L:,:L]=numpy.log(rbk[ce,:,:])
 stack[-L:,L:2*L]=numpy.log(rbk[:,ce,:])
 stack[-L:,2*L:3*L]=numpy.log(rbk[:,:,ce])
 for i in range(len(quatlists)):
-	quatx,n=readlist(path,quatlists[i])
-	print n
-	quat=quatx[:,:4]
-	numquat[i]=n
-	t0=time.time()
-	m0=memorycons()
-	print 'expansion'
-	slices=handyCythonLib.expand(rbk,quat,k0)
-	t1=time.time()
-	m1=memorycons()
-	print 'time executed for expansion is',t1-t0
-	print 'memory executed for expansion is',m1-m0
-	print 'compression'
-	rbk1=handyCythonLib.compress(slices,quat,k0)
-	t2=time.time()
-	m2=memorycons()
-	print 'time executed for compression is',t2-t1
-	print 'memory executed for compression is',m2-m1
-	title=os.path.join(saving,'center cut '+str(quatlists[i])+'.png')
-	showcuts(log(rbk1),ce,title)
-	memorylist[i]=numpy.asarray([m0,m1,m2])
-	timelist[i]=numpy.asarray([t1-t0,t2-t1])
-	ResResErr[i]=handyCythonLib.angAveDif(rbk1,rbk,r3)/angave[0]
-	ratio[i]=handyCythonLib.angAve(rbk1/rbk,r3)
-	angave[i+1]=handyCythonLib.angAve(rbk1,r3)
-	xy[i+1]=numpy.log(rbk1[ce,ce,:])
-	xz[i+1]=numpy.log(rbk1[ce,:,ce])
-	yz[i+1]=numpy.log(rbk1[:,ce,ce])
-	stack[L*i:L*i+L,:L]=numpy.log(rbk1[ce,:,:])
-	stack[L*i:L*i+L,L:2*L]=numpy.log(rbk1[:,ce,:])
-	stack[L*i:L*i+L,2*L:3*L]=numpy.log(rbk1[:,:,ce])
+    quatx,n=readlist(path,quatlists[i])
+    print n
+    quat=quatx[:,:4]
+    numquat[i]=n
+    t0=time.time()
+    m0=memorycons()
+    print 'expansion'
+    slices=handyCythonLib.expand(rbk,quat,k0)
+    t1=time.time()
+    m1=memorycons()
+    print 'time executed for expansion is',t1-t0
+    print 'memory executed for expansion is',m1-m0
+    print 'compression'
+    rbk1=handyCythonLib.compress(slices,quat,k0)
+    t2=time.time()
+    m2=memorycons()
+    print 'time executed for compression is',t2-t1
+    print 'memory executed for compression is',m2-m1
+    title=os.path.join(saving,'center cut '+str(quatlists[i])+'.png')
+    showcuts(log(rbk1),ce,title)
+    memorylist[i]=numpy.asarray([m0,m1,m2])
+    timelist[i]=numpy.asarray([t1-t0,t2-t1])
+    ResResErr[i]=handyCythonLib.angAveDif(rbk1,rbk,r3)/angave[0]
+    ratio[i]=handyCythonLib.angAve(rbk1/rbk,r3)
+    angave[i+1]=handyCythonLib.angAve(rbk1,r3)
+    xy[i+1]=numpy.log(rbk1[ce,ce,:])
+    xz[i+1]=numpy.log(rbk1[ce,:,ce])
+    yz[i+1]=numpy.log(rbk1[:,ce,ce])
+    stack[L*i:L*i+L,:L]=numpy.log(rbk1[ce,:,:])
+    stack[L*i:L*i+L,L:2*L]=numpy.log(rbk1[:,ce,:])
+    stack[L*i:L*i+L,2*L:3*L]=numpy.log(rbk1[:,:,ce])
 
 plotcuts(yf=xy,label='x=0,y=0')
 plotcuts(yf=xy,label='x=0,z=0')
