@@ -57,7 +57,10 @@ def expand():
     global g_my_tomograms1
     global g_num_pix_in_ref_tomo
     global job_len
-    g_my_tomograms1 = np.random.rand(job_len, g_num_pix_in_ref_tomo).astype(g_dtype)
+    print "randomizing"
+    tmp =10*np.random.rand(job_len, g_num_pix_in_ref_tomo).astype(g_dtype)
+    g_my_tomograms1[:] = tmp.copy()
+    print "Rank %d tot: %e"%(rank, tmp.mean())
 
 def maximize():
     global g_my_tomograms1
@@ -75,24 +78,25 @@ def measureModelChange():
 
 start_t = MPI.Wtime()
 readData()
-quatFN = os.path.join(op.quatDir, "quaternion10.dat")
+quatFN = os.path.join(op.quatDir, "quaternion1.dat")
 makeRefTomogram()
 g_all_quat = readQuaternion(quatFN)
 g_len_all_quat = len(g_all_quat)
 g_num_pix_in_ref_tomo = len(g_my_ref_tomo)
 
 if rank == 0:
-    g_all_tomograms1 = np.empty((g_len_all_quat, g_num_pix_in_ref_tomo), dtype=g_dtype)
-    g_all_tomograms2 = np.empty((g_len_all_quat, g_num_pix_in_ref_tomo), dtype=g_dtype)
+    g_all_tomograms1 = np.zeros((g_len_all_quat, g_num_pix_in_ref_tomo), dtype=g_dtype)
+    g_all_tomograms2 = np.zeros((g_len_all_quat, g_num_pix_in_ref_tomo), dtype=g_dtype)
 
 
 job_len   = [len(rng) for rng in np.array_split(np.arange(g_len_all_quat), commSize)][rank]
-g_my_tomograms1 = np.empty((job_len, g_num_pix_in_ref_tomo), dtype=g_dtype)
+g_my_tomograms1 = np.zeros((job_len, g_num_pix_in_ref_tomo), dtype=g_dtype)
+g_my_tomograms2 = np.zeros((job_len, g_num_pix_in_ref_tomo), dtype=g_dtype)
 end_t   = MPI.Wtime()
 print("Rank %d done with setup in %lf seconds"%(rank, end_t-start_t))
 
 #This is where you would insert the loop.
-for iter_num in range(5):
+for iter_num in range(2):
     start_t = MPI.Wtime()
     comm.Scatter([g_all_tomograms1, MPI.FLOAT], [g_my_tomograms1, MPI.FLOAT], root=0)
     comm.Scatter([g_all_tomograms2, MPI.FLOAT], [g_my_tomograms2, MPI.FLOAT], root=0)
