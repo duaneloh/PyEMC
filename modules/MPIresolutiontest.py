@@ -1,20 +1,8 @@
 import sys, os
-import cv2
-import csv
 import numpy
-import scipy
-import matplotlib.pyplot as plt
-import matplotlib.cm as cm
-from matplotlib.ticker import MultipleLocator
+#import matplotlib.pyplot as plt
 import os
 import math
-import skimage
-from skimage import measure
-from skimage import filter, morphology
-from itertools import combinations
-from scipy import ndimage
-#from mahotas.polygon import fill_convexhull
-import time
 import resource
 from mpi4py import MPI
 #sys.path.append(os.path.abspath('../myFunctions'))
@@ -73,13 +61,13 @@ def showcuts(rbk,ce,title):
     ax1=fig.add_subplot(131)
     ax1.imshow(rbk[ce,:,:])
     ax2=fig.add_subplot(132)
-    ax2.imshow(rbk[:,ce,;])
+    ax2.imshow(rbk[:,ce,:])
     ax3=fig.add_subplot(133)
     ax3.imshow(rbk[:,:,ce])
     fig.savefig(title,bbox='tight')
     plt.close()
 
-def plotcuts(yf, label, dropzero=False,ylim=False, xlim=False)
+def plotcuts(yf, label, dropzero=False,ylim=False, xlim=False):
     n=yf.shape[0]
     rm=yf.shape[1]
     t=int(rm/numpy.sqrt(3))
@@ -104,7 +92,7 @@ def plotcuts(yf, label, dropzero=False,ylim=False, xlim=False)
 inputDir = '/Volumes/Untitled/3D-reconstruction/29_20150504_141003_2015-05-05-14-05/'
 path= '/mnt/cbis/home/barzhas/working_dir/PyEMC/quaternions/'
 saving='/mnt/cbis/home/barzhas/working_dir/PyEMC/testresults1/'
-L=375
+L=125
 ce=(L-1)/2
 R=48
 sigma=R/2
@@ -113,13 +101,13 @@ sigma=R/2
 
 Ro=numpy.zeros((L,L,L),dtype='double')
 rbk=numpy.zeros((L,L,L),dtype='double')
-local_n=numpy.zeros(1)
-
+n=numpy.zeros(1)
+start=MPI.Wtime()
 xv,yv,zv=numpy.mgrid[-ce:ce+1,-ce:ce+1,-ce:ce+1]
 kv=numpy.double(numpy.sqrt(xv**2+yv**2+zv**2))
 r3=numpy.round(kv).astype('int')
 kradius=numpy.arange(r3.max()+1)
-
+local_n=numpy.zeros(1)
 k0=RefTom(ce)
 
 if rank ==0:
@@ -130,20 +118,23 @@ if rank ==0:
     Rbk=Rok*gau
     rbk=numpy.double(numpy.abs(Rbk))
     Rbr=numpy.abs(numpy.fft.ifftn(Rbk))
-    quatx,n=readlist(path,10)
-    local_n=n/size
-
-
-comm.Bcast(Ro, root=0)
+    quatx,n[0]=readlist(path,10)
+    local_n[0]=n/size
+else:
+    quatx=None
 comm.Bcast(rbk, root=0)
 comm.Bcast(local_n,root=0)
-
-local_quat=numpy.zeros((local_n,5),dtype='double')
-
+#local_n[0]=n/size
+#comm.Bcast(n, root=0)
+#quatx=numpy.zeros((n[0],5), dtype='double')
+#comm.Bcast(quatx, root=0)
+#local_quat=numpy.split(quatx,size)[rank]
+local_quat=numpy.zeros((local_n,5), dtype='double')
 comm.Scatter(quatx,local_quat,root=0)
 
-print ('process '+str(rank)+'has quat of shape '+ str(local_quat.shape))
-
+comm.Barrier()
+end=MPI.Wtime()
+print end - start
 
 #slices=handyCythonLib.expand(rbk,quat,k0)
 #rbk1=handyCythonLib.compress(slices,quat,k0)
