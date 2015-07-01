@@ -1,9 +1,11 @@
 from mpi4py import MPI
 import numpy as np
 from optparse import OptionParser
-import os
+import sys,os
 import h5py
 
+sys.path.append(os.path.abspath('../modules'))
+import mpihandyCythonLib
 #Introduce command line arguments
 #Also specify some default directory names
 srcDir = os.getcwd()
@@ -49,7 +51,18 @@ def readModel(fn=None):
         g_curr_model = np.random.rand(125,125,125).astype(g_dtype)
     else:
         #read 3D model from h5 file here
-        pass
+        modelFN = os.path.join(op.modelDir, fn)
+        f=h5py.File(modelFN,"r")
+        g_curr_model=f["data"].value
+        f.close()
+
+def saveModel(i):
+        global g_updated_model
+        #write 3D model to h5 file here
+        modelFN = os.path.join(op.modelDir, "model"+str(i+1)+".h5")
+        f=h5py.File(modelFN,"w")
+        f.create_dataset("data",data=g_updated_model,compression="gzip", compression_opts=9)
+        f.close()
 
 def makeRefTomogram(qMax=None):
     global g_my_ref_tomo
@@ -71,7 +84,7 @@ def expand():
     global g_my_ref_tomo
     global g_my_quat
     global g_curr_model
-    g_my_tomograms1=handyCythonLib.expand(g_curr_model,g_my_quat, g_my_ref_tomo)
+    g_my_tomograms1=mpihandyCythonLib.expand(g_curr_model,g_my_quat, g_my_ref_tomo)
     print "Rank %d done with expanding %s tomograms"%(rank, g_my_tomograms1.shape)
 
 def maximize():
@@ -89,7 +102,7 @@ def compress():
     global g_total_weights
     global g_updated_model
     
-    g_my_moments, g_my_weights= handyCythonLib.compress(g_my_tomograms2,g_my_quat, g_my_ref_tomo)
+    g_my_moments, g_my_weights= mpihandyCythonLib.compress(g_my_tomograms2,g_my_quat, g_my_ref_tomo)
     
     #summing up all moments and weights for different processes
     
@@ -98,7 +111,7 @@ def compress():
     
     #final division of moments by weights
     
-    g_updated_model= handyCythonLib.array_division(g_total_moments, g_total_weights)
+    g_updated_model= mpihandyCythonLib.array_division(g_total_moments, g_total_weights)
     
     #total weights and moments should be set to zero(for the next iteration)
     
@@ -137,6 +150,10 @@ for iter_num in range(5):
     maximize()
     compress()
     end_t   = MPI.Wtime()
+    
+    if root=0:
+        saveModel(iter_num)
+    g_curr_model=g_updated_model.copy()
     print "Rank %d: I'm done with iteration %d in %lf seconds"%(rank, iter_num, end_t-start_t)
 
 
