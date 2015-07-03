@@ -4,14 +4,16 @@ from optparse import OptionParser
 import sys,os
 import h5py
 
-sys.path.append(os.path.abspath('../modules'))
+sys.path.append(os.path.abspath('modules'))
 import mpihandyCythonLib
 #Introduce command line arguments
 #Also specify some default directory names
 srcDir = os.getcwd()
 quatDir = os.path.join(srcDir, "quaternions")
+modelDir = os.path.join(srcDir, "models")
 parser = OptionParser()
 parser.add_option("-Q", "--quatDir", action="store", type="string", dest="quatDir", help="absolute path to input quaternions", metavar="", default=quatDir)
+parser.add_option("-M", "--modelDir", action="store", type="string", dest="modelDir", help="absolute path to store generated models", metavar="", default=modelDir)
 #parser.add_option("-d", action="store_true", dest="detailed", default=False, help="do detailed reconstruction")
 (op, args) = parser.parse_args()
 
@@ -32,7 +34,8 @@ g_my_weights        = None
 g_total_moments     = None
 g_total_weights     = None
 g_updated_model     = None
-g_dtype             = np.float32
+g_dtype             = np.float64
+qMax                = 62
 
 def readData():
     pass
@@ -46,9 +49,18 @@ def readQuaternion(quatFN):
     return all_quat.astype(g_dtype)
 
 def readModel(fn=None):
-    global g_curr_model
+    global g_curr_model 
+    g_curr_model=np.empty((125,125,125),dtype=g_dtype)
     if fn is None:
-        g_curr_model = np.random.rand(125,125,125).astype(g_dtype)
+        if rank==0:
+            g_curr_model = np.random.rand(125,125,125).astype(g_dtype)
+            modelFN = os.path.join(op.modelDir, "model0.h5")
+            f=h5py.File(modelFN,"w")
+            f.create_dataset("data",data=g_curr_model,compression="gzip", compression_opts=9)
+            f.close()
+            print 'hi! this is rank=0 and I am done with creating and saving random volume function!'
+            comm.Bcast(g_curr_model)
+            print 'hello once again! that is rank=0 and I have broadcasted the current model to everyone'
     else:
         #read 3D model from h5 file here
         modelFN = os.path.join(op.modelDir, fn)
@@ -84,6 +96,7 @@ def expand():
     global g_my_ref_tomo
     global g_my_quat
     global g_curr_model
+    print "Rank %d done with tomo shape %s"%(rank, g_my_ref_tomo.shape)
     g_my_tomograms1=mpihandyCythonLib.expand(g_curr_model,g_my_quat, g_my_ref_tomo)
     print "Rank %d done with expanding %s tomograms"%(rank, g_my_tomograms1.shape)
 
@@ -124,8 +137,9 @@ def measureModelChange():
 
 start_t = MPI.Wtime()
 readData()
+readModel("model0.h5")
 quatFN = os.path.join(op.quatDir, "quaternion10.dat")
-makeRefTomogram()
+makeRefTomogram(qMax=qMax)
 g_all_quat = readQuaternion(quatFN)
 g_len_all_quat = len(g_all_quat)
 g_num_pix_in_ref_tomo = len(g_my_ref_tomo)
@@ -133,16 +147,17 @@ g_num_pix_in_ref_tomo = len(g_my_ref_tomo)
 if rank == 0:
     g_all_tomograms1 = np.empty((g_len_all_quat, g_num_pix_in_ref_tomo), dtype=g_dtype)
     g_all_tomograms2 = np.empty((g_len_all_quat, g_num_pix_in_ref_tomo), dtype=g_dtype)
-
-
-job_len   = [len(rng) for rng in np.array_split(g_len_all_quat, commSize)]
-job_lencumsum=numpy.cumsum([len(rng) for rng in np.array_split(g_len_all_quat, commSize)])
+    
+g_total_weights=np.zeros_like(g_curr_model)
+g_total_moments=np.zeros_like(g_curr_model)
+job_len   = [len(rng) for rng in np.array_split(np.arange(g_len_all_quat), commSize)]
+job_lencumsum=np.cumsum(job_len)
 g_my_quat=g_all_quat[job_lencumsum[rank]-job_len[rank]:job_lencumsum[rank]]
-g_my_tomograms1 = np.empty((job_len, g_num_pix_in_ref_tomo), dtype=g_dtype)
+g_my_tomograms1 = np.zeros((job_len[rank], g_num_pix_in_ref_tomo), dtype=g_dtype)
 end_t   = MPI.Wtime()
 print("Rank %d done with setup in %lf seconds"%(rank, end_t-start_t))
 
-
+print "rank %d has model with %lf sum"%(rank, g_curr_model.sum())
 #This is where you would insert the loop.
 for iter_num in range(5):
     start_t = MPI.Wtime()
@@ -151,7 +166,7 @@ for iter_num in range(5):
     compress()
     end_t   = MPI.Wtime()
     
-    if root=0:
+    if rank==0:
         saveModel(iter_num)
     g_curr_model=g_updated_model.copy()
     print "Rank %d: I'm done with iteration %d in %lf seconds"%(rank, iter_num, end_t-start_t)
