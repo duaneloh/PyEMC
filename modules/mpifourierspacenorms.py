@@ -21,9 +21,12 @@ m=p2.keys()
 shiftlist=numpy.arange(1,101)
 s=len(shiftlist)
 
-localshift   = [np.array_split(shiftlist, commSize)][rank]
+print "Rank %d done with reading data"%(rank)
+
+localshift   = [numpy.array_split(shiftlist, commSize)][rank]
 
 for shift in localshift:
+
     stack=numpy.empty((len(l)-shift,63),dtype='float')
     for i in range(len(l)-shift):
         print l[i]
@@ -38,8 +41,8 @@ for shift in localshift:
         img=p2[m[i]].value
         img1=p2[m[i+shift]].value
         tack[i]=handyCythonLib.qNorm(img,img1)
-
     qfile.create_dataset("particle2/"+str(shift), data=tack , compression="gzip", compression_opts=9)
+    print "Rank %d done with generating stack for shift  %s "%(rank, shift)
 
 f.close()
 qfile.close()
