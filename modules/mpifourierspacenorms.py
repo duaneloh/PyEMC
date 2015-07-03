@@ -23,7 +23,7 @@ s=len(shiftlist)
 
 print "Rank %d done with reading data"%(rank)
 
-localshift   = [numpy.array_split(shiftlist, commSize)][rank]
+localshift   = numpy.array_split(shiftlist, commSize)[rank]
 
 for shift in localshift:
 
