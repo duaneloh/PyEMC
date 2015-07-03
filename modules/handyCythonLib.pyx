@@ -349,6 +349,29 @@ def angAve(numpy.ndarray[numpy.double_t, ndim=3] W1, numpy.ndarray[numpy.int64_t
     return sumint
 
 
+def qNorm(numpy.ndarray[numpy.double_t, ndim=2] W1,numpy.ndarray[numpy.double_t, ndim=2] W2):
+    assert W1.shape[0]==W2.shape[0] and W1.shape[0]==W1.shape[1] and W2.shape[1]==W1.shape[1]
+    
+    cdef int L=W1.shape[0]
+    cdef int R=(L-1)/2
+    cdef numpy.ndarray[numpy.double_t, ndim=1] norms=numpy.zeros(R+1, dtype='double')
+    cdef int i,j,r
+    
+    for i from 0<=i< L:
+        for j from 0<=j< L:
+            r=int(round(sqrt((i-R)*(i-R)+(j-R)*(j-R))))
+            if r<=R:
+                norms[r]+=(W1[i,j]-W2[i,j])**2
+          
+    for r from 0<=r<R+1:
+        norms[r]=sqrt(norms[r])
+    
+    return norms
+
+
+
+
+
 
 
 
