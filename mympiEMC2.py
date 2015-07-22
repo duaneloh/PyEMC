@@ -10,7 +10,7 @@ import mpihandyCythonLib
 #Also specify some default directory names
 srcDir = os.getcwd()
 quatDir = os.path.join(srcDir, "quaternions")
-modelDir = os.path.join(srcDir, "models/2107")
+modelDir = os.path.join(srcDir, "models")
 parser = OptionParser()
 parser.add_option("-Q", "--quatDir", action="store", type="string", dest="quatDir", help="absolute path to input quaternions", metavar="", default=quatDir)
 parser.add_option("-M", "--modelDir", action="store", type="string", dest="modelDir", help="absolute path to store generated models", metavar="", default=modelDir)
@@ -36,9 +36,11 @@ g_total_weights     = None
 g_updated_model     = None
 g_dtype             = np.float64
 qMax                = 62
-dataDir="/mnt/cbis/home/barzhas/data/3drec/fcutoutsmovie.h5"
-def readData(dataDir,qMax):
+dataDir=""
+def readData(dataDir):
     global g_my_ref_tomo
+    global dataStack
+    
     data=h5py.File(dataDir,"r")
     movie=data[data.keys()[0]].value
     a,b,c=movie.shape
@@ -46,9 +48,8 @@ def readData(dataDir,qMax):
     average_data=0
     print 'rank', rank, 'is reading the data'
     for i in range(a):
-        print 'rank',rank,'is reading image',i
         for j in range(g_my_ref_tomo.shape[0]):
-            dataStack[i,j]=movie[i,g_my_ref_tomo[j,0]+qMax,g_my_ref_tomo[j,1]+qMax]
+            dataStack[i,j]=movie[i,g_my_ref_tomo[j,0],g_my_ref_tomo[j,1]]
             average_data+=dataStack[i,j]
     data.close()
     print 'rank', rank, 'has finished reading the data'
@@ -115,11 +116,44 @@ def expand():
     g_my_tomograms1=mpihandyCythonLib.expand(g_curr_model,g_my_quat, g_my_ref_tomo)
     print "Rank %d done with expanding %s tomograms"%(rank, g_my_tomograms1.shape)
 
-def maximize():
+def maximize(Rmin, Rmax, g_len_all_quat, g_num_frames,job_len,job_start):
     global g_my_tomograms1
     global g_my_tomograms2
+    global g_my_ref_tomo
+    
     g_my_tomograms2 = g_my_tomograms1.copy()
     print "Rank %d done with copying %s tomograms"%(rank, g_my_tomograms1.shape)
+    g_my_distances=mpihandyCythonLib.maximize(dataStack,g_my_tomograms1,g_my_ref_tomo, Rmin, Rmax)
+    g_total_distances=np.empty((g_len_all_quat,g_num_frames), dtype='float')
+    print 'stacking distance arrays together'
+    comm.Reduce(g_my_distances, g_total_distances, op= MPI.SUM)
+#    comm.Barrier()
+    if rank==0:
+        print 'converting total distance array to binary'
+        min_distances = np.argmin(g_total_distances,axis=0)
+        g_total_binary_dist = np.zeros_like(g_total_distances)
+        del g_total_distances
+        del g_my_distances
+        g_total_binary_dist[min_distances, np.arange(g_num_frames)]=1
+        g_total_binary_dist=g_total_binary_dist.flatten()
+    else:
+        del g_total_distances
+        del g_my_distances
+        g_total_binary_dist = None
+    g_my_binary_dist=np.empty(len(g_my_tomograms1)*g_num_frames,dtype='float')
+    print "scattering total binary array to the processes"
+    comm.Scatterv([g_total_binary_dist,tuple(job_len*g_num_frames),tuple(job_start*g_num_frames),MPI.FLOAT],g_my_binary_dist)
+    g_my_binary_dist=np.resize(g_my_binary_dist,(len(g_my_tomograms1),g_num_frames))
+    print 'rank',rank,'is substituting the tomograms with the data'
+    for i in range(len(g_my_tomograms2)):
+        if np.sum(g_my_binary_dist[i,:])==0:
+            continue
+        similarFrameIndex=np.nonzero(g_my_binary_dist[i,:])[0]
+        sumSimilarFrames=np.sum(dataStack[similarFrameIndex],axis=0)
+        g_my_tomograms2[i]=1.0*sumSimilarFrames/np.sum(g_my_binary_dist[i,:])
+        print 'rank',rank,'has updated tomogram',i,' by the average of',np.sum(g_my_binary_dist[i,:]),'frames'
+    del g_my_binary_dist
+
 
 def compress():
     global g_my_quat
@@ -152,22 +186,23 @@ def measureModelChange():
 
 start_t = MPI.Wtime()
 makeRefTomogram(qMax=qMax)
-dataStack,average_data = readData(dataDir,qMax)
+dataStack,average_data = readData(dataDir)
+g_num_frames=len(dataStack)
 print average_data
-readModel("model.h5")
+readModel("model0.h5")
 quatFN = os.path.join(op.quatDir, "quaternion4.dat")
 g_all_quat = readQuaternion(quatFN)
 g_len_all_quat = len(g_all_quat)
 g_num_pix_in_ref_tomo = len(g_my_ref_tomo)
 
-if rank == 0:
-    g_all_tomograms1 = np.empty((g_len_all_quat, g_num_pix_in_ref_tomo), dtype=g_dtype)
-    g_all_tomograms2 = np.empty((g_len_all_quat, g_num_pix_in_ref_tomo), dtype=g_dtype)
-    
+#if rank == 0:
+#    g_all_tomograms1 = np.empty((g_len_all_quat, g_num_pix_in_ref_tomo), dtype=g_dtype)
+#    g_all_tomograms2 = np.empty((g_len_all_quat, g_num_pix_in_ref_tomo), dtype=g_dtype)
+
 g_total_weights=np.zeros_like(g_curr_model)
 g_total_moments=np.zeros_like(g_curr_model)
 job_len   = [len(rng) for rng in np.array_split(np.arange(g_len_all_quat), commSize)]
-#job_lencumsum=np.cumsum(job_len)
+job_start=np.cumsum(job_len)-job_len
 #g_my_quat=g_all_quat[job_lencumsum[rank]-job_len[rank]:job_lencumsum[rank]]
 g_my_quat=g_all_quat[np.array_split(np.arange(g_len_all_quat), commSize)[rank]]
 g_my_indeces=np.array_split(np.arange(g_len_all_quat), commSize)[rank]
@@ -191,7 +226,7 @@ for iter_num in range(5):
         compress()
     else:
         expand()
-        maximize()
+        maximize(Rmin, Rmax, g_len_all_quat, g_num_frames,job_len,job_start)
         compress()
     end_t   = MPI.Wtime()
     

@@ -63,6 +63,16 @@ def RefTom(int R):
     cdef numpy.ndarray[numpy.int_t, ndim=2] k=numpy.vstack((a,b,c)).T
     return k
 
+def MaxTom(int Rmin, int Rmax):
+    cdef numpy.ndarray[numpy.int_t, ndim=2] xv=numpy.mgrid[-Rmax:Rmax+1,-Rmax:Rmax+1][0]
+    cdef numpy.ndarray[numpy.int_t, ndim=2] yv=numpy.mgrid[-Rmax:Rmax+1,-Rmax:Rmax+1][1]
+    cdef numpy.ndarray[numpy.int_t, ndim=2] r=numpy.sqrt(xv**2+yv**2)
+    cdef numpy.ndarray[numpy.int_t, ndim=2] boolka=numpy.logical_and(r>Rmin,r<Rmax)
+    cdef numpy.ndarray[numpy.int_t, ndim=1] a=numpy.where(boolka)[0]-Rmax
+    cdef numpy.ndarray[numpy.int_t, ndim=1] b=numpy.where(boolka)[1]-Rmax
+    cdef numpy.ndarray[numpy.int_t, ndim=2] k=numpy.vstack((a,b)).T
+    return k
+
 def CalcRotMat(numpy.ndarray[numpy.float_t, ndim=1] q):
     assert q.dtype==numpy.float
     cdef numpy.ndarray[numpy.float_t, ndim=2] rotmat=numpy.zeros((3,3),dtype='float')
@@ -146,6 +156,28 @@ def expand(numpy.ndarray[numpy.float_t, ndim=3] W, numpy.ndarray[numpy.float_t, 
             stack[n,j]=v000*dx*dy*dz+v100*dx1*dy*dz+v010*dx*dy1*dz+v110*dx1*dy1*dz+v001*dx*dy*dz1+v101*dx1*dy*dz1+v011*dx*dy1*dz1+v111*dx1*dy1*dz1
 
     return stack
+
+def maximize(numpy.ndarray[numpy.float_t,ndim=2] projections,numpy.ndarray[numpy.float_t, ndim=2] tomograms,numpy.ndarray[numpy.int_t, ndim=2] k0, int Rmin, int Rmax):
+    cdef int pix_index,quat_index,frame_index
+    cdef float  distance
+    cdef numpy.ndarray[numpy.float_t, ndim=2] distances=numpy.empty((tomograms.shape[0],projections.shape[0]),dtype='float')
+    cdef int ix,iy
+#    cdef numpy.ndarray[numpy.int_t, ndim=2] k=MaxTom(Rmin,Rmax)
+    for quat_index from 0 <= quat_index < tomograms.shape[0]:
+        for frame_index from 0 <= frame_index < projections.shape[0]:
+            distance=0
+            for pix_index from 0 <= i < k0.shape[0]:
+                ix=k0[pix_index,0]
+                iy=k0[pix_index,1]
+                if sqrt(ix*ix+iy*iy)>0.99*Rmax or sqrt(ix*ix+iy*iy)<0.99*Rmin:
+                    continue
+                distance+=(tomograms[quat_index,pix_index]-projections[frame_index,pix_index])**2
+            distances[quat_index,frame_index]=distance
+    
+    return distances
+
+
+
 
 
 def compress(numpy.ndarray[numpy.float_t,ndim=2] slices,numpy.ndarray[numpy.float_t, ndim=2] quat,numpy.ndarray[numpy.int_t, ndim=2] k0):
