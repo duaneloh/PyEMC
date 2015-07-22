@@ -10,7 +10,7 @@ import mpihandyCythonLib
 #Also specify some default directory names
 srcDir = os.getcwd()
 quatDir = os.path.join(srcDir, "quaternions")
-modelDir = os.path.join(srcDir, "models")
+modelDir = os.path.join(srcDir, "models/2107")
 parser = OptionParser()
 parser.add_option("-Q", "--quatDir", action="store", type="string", dest="quatDir", help="absolute path to input quaternions", metavar="", default=quatDir)
 parser.add_option("-M", "--modelDir", action="store", type="string", dest="modelDir", help="absolute path to store generated models", metavar="", default=modelDir)
@@ -36,19 +36,22 @@ g_total_weights     = None
 g_updated_model     = None
 g_dtype             = np.float64
 qMax                = 62
-dataDir=""
-def readData(dataDir):
+dataDir="/mnt/cbis/home/barzhas/data/3drec/fcutoutsmovie.h5"
+def readData(dataDir,qMax):
     global g_my_ref_tomo
     data=h5py.File(dataDir,"r")
     movie=data[data.keys()[0]].value
     a,b,c=movie.shape
-    dataStack=numpy.empty((a,g_my_ref_tomo.shape[0]),dtype='float')
+    dataStack=np.empty((a,g_my_ref_tomo.shape[0]),dtype='float')
     average_data=0
+    print 'rank', rank, 'is reading the data'
     for i in range(a):
+        print 'rank',rank,'is reading image',i
         for j in range(g_my_ref_tomo.shape[0]):
-            dataStack[i,j]=movie[i,g_my_ref_tomo[j,0],g_my_ref_tomo[j,1]]
+            dataStack[i,j]=movie[i,g_my_ref_tomo[j,0]+qMax,g_my_ref_tomo[j,1]+qMax]
             average_data+=dataStack[i,j]
     data.close()
+    print 'rank', rank, 'has finished reading the data'
     average_data/=a
     return dataStack,average_data
 
@@ -149,9 +152,9 @@ def measureModelChange():
 
 start_t = MPI.Wtime()
 makeRefTomogram(qMax=qMax)
-dataStack,average_data = readData(dataDir)
+dataStack,average_data = readData(dataDir,qMax)
 print average_data
-readModel("model0.h5")
+readModel("model.h5")
 quatFN = os.path.join(op.quatDir, "quaternion4.dat")
 g_all_quat = readQuaternion(quatFN)
 g_len_all_quat = len(g_all_quat)
@@ -163,7 +166,7 @@ if rank == 0:
     
 g_total_weights=np.zeros_like(g_curr_model)
 g_total_moments=np.zeros_like(g_curr_model)
-#job_len   = [len(rng) for rng in np.array_split(np.arange(g_len_all_quat), commSize)]
+job_len   = [len(rng) for rng in np.array_split(np.arange(g_len_all_quat), commSize)]
 #job_lencumsum=np.cumsum(job_len)
 #g_my_quat=g_all_quat[job_lencumsum[rank]-job_len[rank]:job_lencumsum[rank]]
 g_my_quat=g_all_quat[np.array_split(np.arange(g_len_all_quat), commSize)[rank]]
@@ -174,7 +177,7 @@ print("Rank %d done with setup in %lf seconds"%(rank, end_t-start_t))
 
 print "rank %d has model with %lf sum"%(rank, g_curr_model.sum())
 #This is where you would insert the loop.
-average_model=numpy.zeros(1)
+average_model=np.zeros(1)
 for iter_num in range(5):
     start_t = MPI.Wtime()
     if iter_num==0:
