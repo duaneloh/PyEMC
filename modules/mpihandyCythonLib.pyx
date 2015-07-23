@@ -166,7 +166,7 @@ def maximize(numpy.ndarray[numpy.float_t,ndim=2] projections,numpy.ndarray[numpy
     for quat_index from 0 <= quat_index < tomograms.shape[0]:
         for frame_index from 0 <= frame_index < projections.shape[0]:
             distance=0
-            for pix_index from 0 <= i < k0.shape[0]:
+            for pix_index from 0 <= pix_index < k0.shape[0]:
                 ix=k0[pix_index,0]
                 iy=k0[pix_index,1]
                 if sqrt(ix*ix+iy*iy)>0.99*Rmax or sqrt(ix*ix+iy*iy)<0.99*Rmin:

@@ -10,7 +10,7 @@ import mpihandyCythonLib
 #Also specify some default directory names
 srcDir = os.getcwd()
 quatDir = os.path.join(srcDir, "quaternions")
-modelDir = os.path.join(srcDir, "models")
+modelDir = os.path.join(srcDir, "models/2107")
 parser = OptionParser()
 parser.add_option("-Q", "--quatDir", action="store", type="string", dest="quatDir", help="absolute path to input quaternions", metavar="", default=quatDir)
 parser.add_option("-M", "--modelDir", action="store", type="string", dest="modelDir", help="absolute path to store generated models", metavar="", default=modelDir)
@@ -36,7 +36,9 @@ g_total_weights     = None
 g_updated_model     = None
 g_dtype             = np.float64
 qMax                = 62
-dataDir=""
+Rmin                = 5
+Rmax                = 30
+dataDir="/mnt/cbis/home/barzhas/data/3drec/fcutoutsmovie.h5"
 def readData(dataDir):
     global g_my_ref_tomo
     global dataStack
@@ -126,6 +128,7 @@ def maximize(Rmin, Rmax, g_len_all_quat, g_num_frames,job_len,job_start):
     g_my_distances=mpihandyCythonLib.maximize(dataStack,g_my_tomograms1,g_my_ref_tomo, Rmin, Rmax)
     g_total_distances=np.empty((g_len_all_quat,g_num_frames), dtype='float')
     print 'stacking distance arrays together'
+    comm.Barrier()
     comm.Reduce(g_my_distances, g_total_distances, op= MPI.SUM)
 #    comm.Barrier()
     if rank==0:
@@ -142,8 +145,10 @@ def maximize(Rmin, Rmax, g_len_all_quat, g_num_frames,job_len,job_start):
         g_total_binary_dist = None
     g_my_binary_dist=np.empty(len(g_my_tomograms1)*g_num_frames,dtype='float')
     print "scattering total binary array to the processes"
+    comm.Barrier()
     comm.Scatterv([g_total_binary_dist,tuple(job_len*g_num_frames),tuple(job_start*g_num_frames),MPI.FLOAT],g_my_binary_dist)
     g_my_binary_dist=np.resize(g_my_binary_dist,(len(g_my_tomograms1),g_num_frames))
+
     print 'rank',rank,'is substituting the tomograms with the data'
     for i in range(len(g_my_tomograms2)):
         if np.sum(g_my_binary_dist[i,:])==0:
@@ -189,7 +194,7 @@ makeRefTomogram(qMax=qMax)
 dataStack,average_data = readData(dataDir)
 g_num_frames=len(dataStack)
 print average_data
-readModel("model0.h5")
+readModel("model.h5")
 quatFN = os.path.join(op.quatDir, "quaternion4.dat")
 g_all_quat = readQuaternion(quatFN)
 g_len_all_quat = len(g_all_quat)
