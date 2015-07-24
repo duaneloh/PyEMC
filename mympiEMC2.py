@@ -56,6 +56,10 @@ def readData(dataDir):
     data.close()
     print 'rank', rank, 'has finished reading the data'
     average_data/=a
+    if rank==0:
+        saving=h5py.File(dataDir[:-3]+"ready.h5","w")
+        saving.create_dataset('data',data=dataStack,compression='gzip',compression_opts=9)
+        saving.close()
     return dataStack,average_data
 
 def readQuaternion(quatFN):
@@ -114,9 +118,9 @@ def expand():
     global g_my_ref_tomo
     global g_my_quat
     global g_curr_model
-    print "Rank %d done with tomo shape %s"%(rank, g_my_ref_tomo.shape)
+#    print "Rank %d done with tomo shape %s"%(rank, g_my_ref_tomo.shape)
     g_my_tomograms1=mpihandyCythonLib.expand(g_curr_model,g_my_quat, g_my_ref_tomo)
-    print "Rank %d done with expanding %s tomograms"%(rank, g_my_tomograms1.shape)
+#    print "Rank %d done with expanding %s tomograms"%(rank, g_my_tomograms1.shape)
 
 def maximize(Rmin, Rmax, g_len_all_quat, g_num_frames,job_len,job_start):
     global g_my_tomograms1
@@ -124,32 +128,57 @@ def maximize(Rmin, Rmax, g_len_all_quat, g_num_frames,job_len,job_start):
     global g_my_ref_tomo
     
     g_my_tomograms2 = g_my_tomograms1.copy()
-    print "Rank %d done with copying %s tomograms"%(rank, g_my_tomograms1.shape)
-    g_my_distances=mpihandyCythonLib.maximize(dataStack,g_my_tomograms1,g_my_ref_tomo, Rmin, Rmax)
-    g_total_distances=np.empty((g_len_all_quat,g_num_frames), dtype='float')
-    print 'stacking distance arrays together'
+#    print "Rank %d done with copying %s tomograms"%(rank, g_my_tomograms1.shape)
+    g_my_distances=mpihandyCythonLib.maximize(dataStack,g_my_tomograms1,g_my_ref_tomo, Rmin, Rmax).flatten()
+    if rank==0:
+        g_total_distances=np.empty(g_len_all_quat*g_num_frames, dtype='float')
+       
+    else:
+        g_total_distances=None
+#    print 'stacking distance arrays together'
+#    print 'my distances', g_my_distances.sum(),g_my_distances.shape, rank
+#    if rank==0: print 'total distances', g_total_distances.sum(),g_total_distances.shape,rank
+
+    if rank==5:
+        print tuple(job_len*g_num_frames)
+        print tuple(job_start*g_num_frames)
+    
     comm.Barrier()
-    comm.Reduce(g_my_distances, g_total_distances, op= MPI.SUM)
+    comm.Gatherv(g_my_distances,[ g_total_distances,tuple(job_len*g_num_frames),tuple(job_start*g_num_frames),MPI.DOUBLE])
+   
 #    comm.Barrier()
     if rank==0:
-        print 'converting total distance array to binary'
+        g_total_distances=np.resize(g_total_distances,(g_len_all_quat,g_num_frames))
+        print 'CONVERTING DISTANCE ARRAY TO BINARY!'
         min_distances = np.argmin(g_total_distances,axis=0)
         g_total_binary_dist = np.zeros_like(g_total_distances)
+        print 'total binary sum before setting minimums', g_total_binary_dist.sum()
         del g_total_distances
         del g_my_distances
         g_total_binary_dist[min_distances, np.arange(g_num_frames)]=1
+        print 'total binary sum after setting minimums', g_total_binary_dist.sum()
+        pos=np.nonzero(np.sum(g_total_binary_dist,axis=1))[0]
+      
+        print "total binary distance array's shape is",g_total_binary_dist.shape
         g_total_binary_dist=g_total_binary_dist.flatten()
+        print 'total binary sum after flattenning', g_total_binary_dist.sum()
+        print "total binary distance array's shape is",g_total_binary_dist.shape 
+        print "IMPORTANT PARAMETER IMPORTANT PARAMETER!!!!", pos
     else:
         del g_total_distances
         del g_my_distances
         g_total_binary_dist = None
-    g_my_binary_dist=np.empty(len(g_my_tomograms1)*g_num_frames,dtype='float')
-    print "scattering total binary array to the processes"
+    g_my_binary_dist=np.zeros(len(g_my_tomograms1)*g_num_frames,dtype='float')
+#    print 'local binary array shape', g_my_binary_dist.shape
+#    print "scattering total binary array to the processes", rank
     comm.Barrier()
     comm.Scatterv([g_total_binary_dist,tuple(job_len*g_num_frames),tuple(job_start*g_num_frames),MPI.FLOAT],g_my_binary_dist)
+#    print 'binary sum before resize', g_my_binary_dist.sum(),rank
     g_my_binary_dist=np.resize(g_my_binary_dist,(len(g_my_tomograms1),g_num_frames))
+#    print 'binary sum', g_my_binary_dist.sum(), rank
 
-    print 'rank',rank,'is substituting the tomograms with the data'
+   # print 'rank',rank,'is substituting the tomograms with the data'
+#    print g_my_tomograms2.shape, len(g_my_tomograms2),rank
     for i in range(len(g_my_tomograms2)):
         if np.sum(g_my_binary_dist[i,:])==0:
             continue
@@ -188,14 +217,21 @@ def compress():
 
 def measureModelChange():
     pass
-
+def globalizedata(dataStack1):
+    global dataStack
+    dataStack=dataStack1
+    pass
 start_t = MPI.Wtime()
 makeRefTomogram(qMax=qMax)
-dataStack,average_data = readData(dataDir)
+#dataStack,average_data = readData(dataDir)
+file=h5py.File(dataDir[:-3]+"ready.h5","r")
+dataStack=file["data"].value
 g_num_frames=len(dataStack)
-print average_data
+average_data=1.0*dataStack.sum()/g_num_frames
+print "the average data is", average_data
+globalizedata(dataStack)
 readModel("model.h5")
-quatFN = os.path.join(op.quatDir, "quaternion4.dat")
+quatFN = os.path.join(op.quatDir, "quaternion3.dat")
 g_all_quat = readQuaternion(quatFN)
 g_len_all_quat = len(g_all_quat)
 g_num_pix_in_ref_tomo = len(g_my_ref_tomo)
@@ -206,7 +242,7 @@ g_num_pix_in_ref_tomo = len(g_my_ref_tomo)
 
 g_total_weights=np.zeros_like(g_curr_model)
 g_total_moments=np.zeros_like(g_curr_model)
-job_len   = [len(rng) for rng in np.array_split(np.arange(g_len_all_quat), commSize)]
+job_len   =np.asarray([len(rng) for rng in np.array_split(np.arange(g_len_all_quat), commSize)])
 job_start=np.cumsum(job_len)-job_len
 #g_my_quat=g_all_quat[job_lencumsum[rank]-job_len[rank]:job_lencumsum[rank]]
 g_my_quat=g_all_quat[np.array_split(np.arange(g_len_all_quat), commSize)[rank]]
@@ -218,21 +254,25 @@ print("Rank %d done with setup in %lf seconds"%(rank, end_t-start_t))
 print "rank %d has model with %lf sum"%(rank, g_curr_model.sum())
 #This is where you would insert the loop.
 average_model=np.zeros(1)
-for iter_num in range(5):
+for iter_num in range(20):
     start_t = MPI.Wtime()
-    if iter_num==0:
-        expand()
-        local_average_model=np.sum(g_my_tomograms1)
-        comm.Allreduce(local_average_model,average_model)
-        average_model/=g_len_all_quat
-        if rank==0:
-            print average_model
-        g_my_tomograms2=g_my_tomograms1*(average_data/average_model)
-        compress()
+    expand() 
+    local_average_model=np.sum(g_my_tomograms1)/len(g_my_tomograms1)
+    print 'local average is', local_average_model, rank
+    if iter_num==0:      
+#        print "local_average_model is ", local_average_model/len(g_my_tomograms1)
+#        comm.Allreduce(local_average_model,average_model)
+#        average_model/=g_len_all_quat
+#        if rank==0:
+#            print average_model
+        g_my_tomograms2=g_my_tomograms1*(average_data/local_average_model)
+#        print "local_average_model is ", local_average_model/len(g_my_tomograms2)     
     else:
-        expand()
+       
+#        print "local_average_model is ", local_average_model/len(g_my_tomograms1)
         maximize(Rmin, Rmax, g_len_all_quat, g_num_frames,job_len,job_start)
-        compress()
+   
+    compress()
     end_t   = MPI.Wtime()
     
     if rank==0:
